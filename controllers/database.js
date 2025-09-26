@@ -29,22 +29,30 @@ mongoose.connection.on('disconnected', () => {
 // Reply schema
 const replySchema = new mongoose.Schema({
   text: { type: String, required: true },
-  created_on: { type: Date, default: Date.now },
   delete_password: { type: String, required: true },
+  created_on: { type: Date, default: Date.now },
+  bumped_on: { type: Date, default: Date.now },
   reported: { type: Boolean, default: false }
 });
 
 // Thread schema
 const threadSchema = new mongoose.Schema({
-  board: { type: String, required: true },
   text: { type: String, required: true },
-  created_on: { type: Date, default: Date.now },
-  bumped_on: { type: Date, default: Date.now },
   delete_password: { type: String, required: true },
   reported: { type: Boolean, default: false },
+  created_on: { type: Date, default: Date.now },
+  bumped_on: { type: Date, default: Date.now },
   replies: [replySchema]
 });
 
-const Thread = mongoose.model('Thread', threadSchema);
+// Board schema
+const boardSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  threads: [threadSchema]
+});
 
-module.exports = { Thread };
+const Reply = mongoose.model('Reply', replySchema);
+const Thread = mongoose.model('Thread', threadSchema);
+const Board = mongoose.model('Board', boardSchema);
+
+module.exports = { Reply, Thread, Board };

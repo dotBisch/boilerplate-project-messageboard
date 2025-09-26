@@ -1,37 +1,47 @@
-const { Thread } = require('./database');
+const { Board, Reply } = require('./database');
 
 class ReplyController {
   // Create a new reply
-  static async createReply(board, thread_id, text, delete_password) {
+  static async createReply(boardName, thread_id, text, delete_password) {
     try {
-      const thread = await Thread.findOne({ _id: thread_id, board });
+      const newReply = new Reply({
+        text: text,
+        delete_password: delete_password
+      });
+
+      const boardData = await Board.findOne({ name: boardName });
       
-      if (!thread) {
+      if (!boardData) {
+        throw new Error('Board not found');
+      }
+
+      const threadToAddReply = boardData.threads.id(thread_id);
+      
+      if (!threadToAddReply) {
         throw new Error('Thread not found');
       }
 
-      const replyCreatedOn = new Date();
-      const reply = {
-        text,
-        delete_password,
-        created_on: replyCreatedOn,
-        reported: false
-      };
-
-      thread.replies.push(reply);
-      thread.bumped_on = replyCreatedOn; // Update bumped_on to the reply's creation date
+      const date = new Date();
+      threadToAddReply.bumped_on = date;
+      threadToAddReply.replies.push(newReply);
       
-      const savedThread = await thread.save();
-      return savedThread;
+      const updatedData = await boardData.save();
+      return threadToAddReply;
     } catch (error) {
       throw error;
     }
   }
 
   // Get a single thread with all replies
-  static async getThreadWithReplies(board, thread_id) {
+  static async getThreadWithReplies(boardName, thread_id) {
     try {
-      const thread = await Thread.findOne({ _id: thread_id, board }).lean();
+      const boardData = await Board.findOne({ name: boardName });
+      
+      if (!boardData) {
+        throw new Error('Board not found');
+      }
+
+      const thread = boardData.threads.id(thread_id);
       
       if (!thread) {
         throw new Error('Thread not found');
@@ -54,9 +64,15 @@ class ReplyController {
   }
 
   // Delete a reply
-  static async deleteReply(board, thread_id, reply_id, delete_password) {
+  static async deleteReply(boardName, thread_id, reply_id, delete_password) {
     try {
-      const thread = await Thread.findOne({ _id: thread_id, board });
+      const boardData = await Board.findOne({ name: boardName });
+      
+      if (!boardData) {
+        return 'incorrect password';
+      }
+
+      const thread = boardData.threads.id(thread_id);
       
       if (!thread) {
         return 'incorrect password';
@@ -72,8 +88,9 @@ class ReplyController {
         return 'incorrect password';
       }
 
-      reply.text = '[deleted]';
-      await thread.save();
+      // Remove the reply using pull method for Mongoose 6+
+      thread.replies.pull(reply_id);
+      await boardData.save();
       return 'success';
     } catch (error) {
       return 'incorrect password';
@@ -81,9 +98,15 @@ class ReplyController {
   }
 
   // Report a reply
-  static async reportReply(board, thread_id, reply_id) {
+  static async reportReply(boardName, thread_id, reply_id) {
     try {
-      const thread = await Thread.findOne({ _id: thread_id, board });
+      const boardData = await Board.findOne({ name: boardName });
+      
+      if (!boardData) {
+        throw new Error('Board not found');
+      }
+
+      const thread = boardData.threads.id(thread_id);
       
       if (!thread) {
         throw new Error('Thread not found');
@@ -96,7 +119,8 @@ class ReplyController {
       }
 
       reply.reported = true;
-      await thread.save();
+      reply.bumped_on = new Date();
+      await boardData.save();
       return 'reported';
     } catch (error) {
       throw error;

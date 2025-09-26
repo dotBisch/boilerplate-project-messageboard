@@ -1,67 +1,99 @@
-const { Thread } = require('./database');
+const { Board, Thread } = require('./database');
 
 class ThreadController {
   // Create a new thread
-  static async createThread(board, text, delete_password) {
+  static async createThread(boardName, text, delete_password) {
     try {
-      const now = new Date();
-      const thread = new Thread({
-        board,
-        text,
-        delete_password,
-        created_on: now,
-        bumped_on: now, // bumped_on starts same as created_on
+      const newThread = new Thread({
+        text: text,
+        delete_password: delete_password,
         replies: []
       });
+
+      // Find or create board
+      let boardData = await Board.findOne({ name: boardName });
       
-      const savedThread = await thread.save();
-      return savedThread;
+      if (!boardData) {
+        // Create new board
+        const newBoard = new Board({
+          name: boardName,
+          threads: []
+        });
+        newBoard.threads.push(newThread);
+        const savedBoard = await newBoard.save();
+        return newThread;
+      } else {
+        // Add thread to existing board
+        boardData.threads.push(newThread);
+        await boardData.save();
+        return newThread;
+      }
     } catch (error) {
       throw error;
     }
   }
 
   // Get most recent 10 threads with 3 most recent replies each
-  static async getRecentThreads(board) {
+  static async getRecentThreads(boardName) {
     try {
-      const threads = await Thread.find({ board })
-        .sort({ bumped_on: -1 })
-        .limit(10)
-        .lean();
+      const boardData = await Board.findOne({ name: boardName });
+      
+      if (!boardData) {
+        return [];
+      }
 
-      return threads.map(thread => ({
-        _id: thread._id,
-        text: thread.text,
-        created_on: thread.created_on,
-        bumped_on: thread.bumped_on,
-        replies: thread.replies
+      // Sort threads by bumped_on descending, limit to 10
+      const sortedThreads = boardData.threads
+        .sort((a, b) => new Date(b.bumped_on) - new Date(a.bumped_on))
+        .slice(0, 10);
+
+      return sortedThreads.map(thread => {
+        // Sort replies by created_on descending, limit to 3
+        const recentReplies = thread.replies
           .sort((a, b) => new Date(b.created_on) - new Date(a.created_on))
           .slice(0, 3)
           .map(reply => ({
             _id: reply._id,
             text: reply.text,
             created_on: reply.created_on
-          }))
-      }));
+          }));
+
+        return {
+          _id: thread._id,
+          text: thread.text,
+          created_on: thread.created_on,
+          bumped_on: thread.bumped_on,
+          replies: recentReplies,
+          replycount: thread.replies.length
+        };
+      });
     } catch (error) {
       throw error;
     }
   }
 
   // Delete a thread
-  static async deleteThread(board, thread_id, delete_password) {
+  static async deleteThread(boardName, thread_id, delete_password) {
     try {
-      const thread = await Thread.findOne({ _id: thread_id, board });
+      const boardData = await Board.findOne({ name: boardName });
       
-      if (!thread) {
+      if (!boardData) {
         return 'incorrect password';
       }
       
-      if (thread.delete_password !== delete_password) {
+      const threadToDelete = boardData.threads.id(thread_id);
+      
+      if (!threadToDelete) {
         return 'incorrect password';
       }
       
-      await Thread.deleteOne({ _id: thread_id });
+      if (threadToDelete.delete_password !== delete_password) {
+        return 'incorrect password';
+      }
+      
+      // Use pull instead of remove for Mongoose 6+
+      boardData.threads.pull(thread_id);
+      await boardData.save();
       return 'success';
     } catch (error) {
       return 'incorrect password';
@@ -69,12 +101,23 @@ class ThreadController {
   }
 
   // Report a thread
-  static async reportThread(board, thread_id) {
+  static async reportThread(boardName, thread_id) {
     try {
-      await Thread.updateOne(
-        { _id: thread_id, board },
-        { reported: true }
-      );
+      const boardData = await Board.findOne({ name: boardName });
+      
+      if (!boardData) {
+        throw new Error('Board not found');
+      }
+      
+      const reportedThread = boardData.threads.id(thread_id);
+      
+      if (!reportedThread) {
+        throw new Error('Thread not found');
+      }
+      
+      reportedThread.reported = true;
+      reportedThread.bumped_on = new Date();
+      await boardData.save();
       return 'reported';
     } catch (error) {
       throw error;
