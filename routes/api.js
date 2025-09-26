@@ -142,7 +142,7 @@ module.exports = function (app) {
         }
 
         const result = await ReplyController.reportReply(board, thread_id, reply_id);
-        res.send('reported');
+        res.send(result);
       } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
       }

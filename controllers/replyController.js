@@ -4,11 +4,6 @@ class ReplyController {
   // Create a new reply
   static async createReply(boardName, thread_id, text, delete_password) {
     try {
-      const newReply = new Reply({
-        text: text,
-        delete_password: delete_password
-      });
-
       const boardData = await Board.findOne({ name: boardName });
       
       if (!boardData) {
@@ -21,7 +16,15 @@ class ReplyController {
         throw new Error('Thread not found');
       }
 
+      // Create reply object with all required fields
       const date = new Date();
+      const newReply = {
+        text: text,
+        delete_password: delete_password,
+        created_on: date,
+        reported: false
+      };
+
       threadToAddReply.bumped_on = date;
       threadToAddReply.replies.push(newReply);
       
@@ -88,8 +91,8 @@ class ReplyController {
         return 'incorrect password';
       }
 
-      // Remove the reply using pull method for Mongoose 6+
-      thread.replies.pull(reply_id);
+      // Change the reply text to [deleted] instead of removing it
+      reply.text = '[deleted]';
       await boardData.save();
       return 'success';
     } catch (error) {
@@ -103,19 +106,19 @@ class ReplyController {
       const boardData = await Board.findOne({ name: boardName });
       
       if (!boardData) {
-        throw new Error('Board not found');
+        return 'error';
       }
 
       const thread = boardData.threads.id(thread_id);
       
       if (!thread) {
-        throw new Error('Thread not found');
+        return 'error';
       }
 
       const reply = thread.replies.id(reply_id);
       
       if (!reply) {
-        throw new Error('Reply not found');
+        return 'error';
       }
 
       reply.reported = true;
@@ -123,7 +126,7 @@ class ReplyController {
       await boardData.save();
       return 'reported';
     } catch (error) {
-      throw error;
+      return 'error';
     }
   }
 }
