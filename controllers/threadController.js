@@ -4,10 +4,13 @@ class ThreadController {
   // Create a new thread
   static async createThread(board, text, delete_password) {
     try {
+      const now = new Date();
       const thread = new Thread({
         board,
         text,
         delete_password,
+        created_on: now,
+        bumped_on: now, // bumped_on starts same as created_on
         replies: []
       });
       

@@ -10,15 +10,16 @@ class ReplyController {
         throw new Error('Thread not found');
       }
 
+      const replyCreatedOn = new Date();
       const reply = {
         text,
         delete_password,
-        created_on: new Date(),
+        created_on: replyCreatedOn,
         reported: false
       };
 
       thread.replies.push(reply);
-      thread.bumped_on = new Date();
+      thread.bumped_on = replyCreatedOn; // Update bumped_on to the reply's creation date
       
       const savedThread = await thread.save();
       return savedThread;

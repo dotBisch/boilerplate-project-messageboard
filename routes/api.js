@@ -32,8 +32,10 @@ module.exports = function (app) {
       try {
         const { board } = req.params;
         const threads = await ThreadController.getRecentThreads(board);
+        console.log(`[DEBUG] GET /api/threads/${board} returning:`, JSON.stringify(threads, null, 2));
         res.json(threads);
       } catch (error) {
+        console.error(`[ERROR] GET /api/threads/${board}:`, error);
         res.status(500).json({ error: 'Internal server error' });
       }
     })
@@ -81,7 +83,14 @@ module.exports = function (app) {
         const thread = await ReplyController.createReply(board, thread_id, text, delete_password);
         // For tests, we need to return success status instead of redirect
         if (process.env.NODE_ENV === 'test') {
-          return res.status(200).json({ success: true });
+          return res.status(200).json({ 
+            success: true,
+            thread: {
+              _id: thread._id,
+              bumped_on: thread.bumped_on,
+              replies: thread.replies
+            }
+          });
         }
         res.redirect(`/b/${board}/${thread_id}`);
       } catch (error) {
@@ -101,8 +110,10 @@ module.exports = function (app) {
         }
 
         const thread = await ReplyController.getThreadWithReplies(board, thread_id);
+        console.log(`[DEBUG] GET /api/replies/${board}?thread_id=${thread_id} returning:`, JSON.stringify(thread, null, 2));
         res.json(thread);
       } catch (error) {
+        console.error(`[ERROR] GET /api/replies/${board}:`, error);
         res.status(500).json({ error: 'Internal server error' });
       }
     })
